@@ -1,0 +1,4 @@
+Neutral Line: https://doi.org/10.5281/zenodo.21200784
+Scaling Laws: https://doi.org/10.5281/zenodo.21205843
+Semantic Helicity: https://doi.org/10.5281/zenodo.21224134
+Tesla 3-6-9: https://doi.org/10.5281/zenodo.21262020
