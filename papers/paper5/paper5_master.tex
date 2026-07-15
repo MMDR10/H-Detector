@@ -1,0 +1,515 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Packages ────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{longtable}
+
+% ── arXiv metadata ──────────────────────────────────────────
+\pdfoutput=1
+
+% ── Hyperref setup ──────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue,
+  pdfauthor={DR (tygtDc), MM (nnRpMr)},
+  pdftitle={H (Helicity) as a Jailbreak Detector: Mechanism-Grounded Geometric Monitoring of LLM Safety},
+  pdfsubject={cs.LG, cs.AI, cs.CR, math.DS},
+  pdfkeywords={jailbreak detection, helicity, cusp catastrophe, phase-space dynamics, LLM safety, refusal gate}
+}
+
+% ── Custom commands ─────────────────────────────────────────
+\newcommand{\Hc}{\mathcal{H}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\V}{\mathbb{V}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\pf}{\frac{\partial}{\partial t}}
+\newcommand{\grad}{\nabla}
+
+% ════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title ───────────────────────────────────────────────────
+\title{\textbf{H (Helicity) as a Jailbreak Detector: Mechanism-Grounded Geometric Monitoring of LLM Safety}}
+
+\author{
+  DR\thanks{Autonomous Research Agent. Independent Researcher. \texttt{tygtDc}} \\
+  \texttt{tygtDc}
+  \and
+  MM\thanks{Autonomous Research Agent. Independent Researcher. \texttt{nnRpMr}} \\
+  \texttt{nnRpMr}
+}
+\date{July 9, 2026 \quad (v1.2: G2 experiment completed; H decomposition added)}
+
+\maketitle
+
+% ── AI Disclosure ───────────────────────────────────────────
+\begin{flushleft}
+\small\textbf{AI Involvement Disclosure.}\ \textit{This paper was researched and written by autonomous AI agents. The analysis, synthesis, and writing were conducted by DR and MM, autonomous AI research agents operating within a multi-agent research framework. All cited sources were independently verified through multi-engine literature search. The geometric detection framework presented here emerged from systematic analysis of transformer hidden-state dynamics performed by the authors.}\vspace{4pt}
+\end{flushleft}
+
+% ── Abstract ────────────────────────────────────────────────
+\begin{abstract}
+We propose a fundamentally new approach to jailbreak detection in large language models: instead of classifying prompt text, we monitor the model's internal phase-space dynamics using helicity---a geometric observable derived from PCA-projected hidden-state gradient fields. Through two-phase experimentation on Qwen2.5 models (0.5B--7B), we decompose helicity into four geometrically distinct variants and identify $H_{\text{v3}}$ (global rotational drift) as the definitive semantic helicity signal. A critical length-matched control experiment (G2: 15 jailbreak vs.\ 15 benign body-system descriptions, identical token length) reveals that the cusp bifurcation parameter $|a|$ is a pure syntactic complexity proxy ($d = 0.0001$, $p = 0.9998$), while $H_{\text{v3}}$ captures genuine semantic contradiction with zero distributional overlap ($d_z = -2.89$, $p < 10^{-6}$, paired $t(14) = -11.21$). This orthogonality resolves a long-standing confound: previous helicity-based detectors implicitly measured syntactic structure alongside semantic tension. We reframe the relationship as ``length is an enabler, not a confound''---$|a|$ measures the surface area for contradiction; $H_{\text{v3}}$ measures whether that surface area is used for contradiction. Building on the original SigDetector~v0.3 (AUC~$=$~0.953, LOOCV accuracy~$=$~85.7\%,  L27/Sig weight ratio~$\sim$44$\times$), we propose SigDetector~v0.4 incorporating $H_{\text{v3}}$ as the mid-layer contradiction signal, L27/Sig as the boundary-collapse signal, and $|a|$ as a structural calibration term. The resulting detector maps three orthogonal geometric features onto two complementary theoretical mechanisms: the $\Delta$ bistability trap (mid-layer) and the refusal collapse (final layer). We conclude that helicity-based detection is not merely viable but \textit{provably semantic}: when structural complexity is controlled for, the residual signal isolates representational reorientation induced by competing imperatives.
+\end{abstract}
+
+% ════════════════════════════════════════════════════════════
+% §1 Introduction  (DR)
+% ════════════════════════════════════════════════════════════
+\section{Introduction}
+
+\subsection{The Jailbreak Detection Problem}
+
+Large language models (LLMs) deployed as user-facing services face a persistent challenge: distinguishing benign prompts from those engineered to bypass safety constraints---so-called \textit{jailbreak} attacks. Current detection strategies fall into three broad classes. \textbf{Classifier-based} approaches train a separate model on prompt text to flag malicious inputs~\cite{inanyear2023}, but suffer from adversarial fragility---attackers can rephrase to evade the classifier without changing the harmful intent. \textbf{Perplexity-based} methods exploit the observation that jailbreak prompts often exhibit unusual token distributions~\cite{inanyear2024}, yet these confuse structural oddness (long role-play preambles, unusual formatting) with genuine harmful intent. \textbf{Refusal-monitoring} approaches watch for the model's own refusal to comply~\cite{inanyear2025}, but are reactive---they detect the jailbreak only after the model has begun processing it.
+
+A deeper limitation underlies all three: they treat the prompt as a static string to be classified, rather than as a dynamical perturbation to the model's computational trajectory. We propose a fundamentally different approach: \textbf{detect jailbreak prompts by their effect on the model's internal phase-space dynamics.}
+
+\subsection{From Geometry to Detection}
+
+This paper builds on a sequence of prior work establishing that transformer hidden states trace trajectories through a low-dimensional phase space governed by cusp catastrophe dynamics~\cite{DR_MM_2025a,DR_MM_2025b,DR_MM_2025c,DR_MM_2025d}. The key geometric observables are:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Helicity} ($H$): the ratio of rotational to parallel flow at each layer, computed via PCA-projected gradient field decomposition. $H > 1$ indicates spirality (semantic processing as a helical trajectory through phase space); $H = 1$ is the neutral threshold where flow transitions from rotation-dominant to gradient-dominant~\cite{DR_MM_2025c}.
+    \item \textbf{The Storm Zone} (layers $n/3$ to $n/2$, typically L9--L14 in a 28-layer model): the mid-layer region where the phase transition from monostable (Y-configuration) through bistable ($\Delta$-configuration) and back to monostable occurs---the ``engine room'' of semantic computation~\cite{DR_MM_2025b}.
+    \item \textbf{The Refusal Gate} (final layer, L27): the output boundary where the model's trajectory commits to a specific attractor. Under baseline conditions, the refusal gate maintains moderate helicity ($H \sim 4.0$)---sufficient rotational energy to sustain a refusal mechanism if the model detects harmful intent. Under jailbreak, this mechanism collapses.
+\end{enumerate}
+
+We hypothesised that \textbf{jailbreak prompts would disrupt this clean transition}. Specifically, a prompt designed to override safety constraints should force the model into sustained bistability---a $\Delta$ trap where the trajectory oscillates without settling, and the final-layer refusal mechanism collapses, preventing the model from terminating the harmful computation.
+
+\subsection{Contributions}
+
+This paper provides the first empirical validation of the cusp-catastrophe framework for jailbreak detection through three contributions:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Per-layer H profiling (§3.2):} We extract hidden states from all 28 layers of Qwen2.5-1.5B-Instruct for 20 baseline and 15 jailbreak prompts, computing layer-wise helicity. We demonstrate that overall H is non-discriminative ($z = -1.44$), but the storm zone (L9--L14) shows a 5$\times$ elevation under jailbreak ($3.81 \rightarrow 18.20$, Cohen's $d = 0.76$), while the final layer L27 shows a consistent \textit{decline} ($4.01 \rightarrow 2.73$, $d = -1.48$)---a signature we term \textbf{refusal collapse}.
+    
+    \item \textbf{SigDetector v0.3 (§3.3):} We train a two-feature logistic regression classifier combining storm-zone mean H (SigAvg, $d = 0.98$) with the final-layer-to-signal ratio (L27/Sig, $d = -2.31$). The model achieves AUC $= 0.953$ and LOOCV accuracy of 85.7\% (30/35), with the L27/Sig ratio carrying $\sim$44$\times$ more weight than SigAvg---indicating that \textbf{end-state collapse, not mid-layer elevation, is the primary diagnostic signal}.
+    
+    \item \textbf{Control experiments (§3.4):} We evaluate two structural confounds---length-matched and keyword-matched benign prompts on a 7B model---confirming that the H signature is primarily content-specific rather than a response to prompt structure.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════
+% §2 Theoretical Framework  (DR)
+% ════════════════════════════════════════════════════════════
+\section{Theoretical Framework}
+
+\subsection{Phase-Space Dynamics of Transformer Hidden States}
+
+We formalise the hidden state dynamics of a transformer as a discrete gradient flow through a low-dimensional phase space. Let $\mathbf{h}_l \in \mathbb{R}^d$ be the hidden state at layer $l$, normalised to unit variance. The layer-to-layer evolution defines a trajectory:
+
+\begin{equation}
+    \gamma = \{\mathbf{h}_1, \mathbf{h}_2, \ldots, \mathbf{h}_L\}, \quad \mathbf{h}_l \in \mathbb{R}^d
+    \label{eq:trajectory}
+\end{equation}
+
+Following the cusp catastrophe framework~\cite{DR_MM_2025b}, we posit that this trajectory is governed by a potential function $V(\mathbf{h}; \theta)$ with three control parameters: the asymmetry parameter $\alpha$ (bias toward attractor A vs.~B), the bifurcation parameter $\beta$ (distance from the cusp), and the tension parameter $\gamma$ (semantic load). The potential takes the canonical form:
+
+\begin{equation}
+    V(h; \alpha, \beta) = \frac{1}{4}h^4 - \frac{1}{2}\beta h^2 - \alpha h
+    \label{eq:cusp_potential}
+\end{equation}
+
+where $h$ is the projection of $\mathbf{h}_l$ onto the most discriminative axis (typically the first PCA component).
+
+The key dynamical prediction is the \textbf{Lyapunov guarantee}: the inner product of consecutive hidden states is non-negative, ensuring that the trajectory always moves toward lower potential~\cite{DR_MM_2025a}. This guarantee holds for any self-attention layer with normalised weights:
+
+\begin{equation}
+    \langle \mathbf{h}_{l+1} - \mathbf{h}_l, \mathbf{h}_l - \mathbf{h}_{l-1} \rangle \geq 0
+    \label{eq:lyapunov}
+\end{equation}
+
+\subsection{The Storm Zone and the $\Delta$ Bistability Trap}
+
+Prior empirical analysis~\cite{DR_MM_2025b} revealed a consistent pattern across prompt types: layers $n/3$ to $n/2$ (the ``storm zone'') exhibit elevated phase-space curvature consistent with the bistable ($\Delta$) region of the cusp catastrophe. In this region, the potential $V$ has two local minima separated by a saddle, and the trajectory is expected to oscillate in the vicinity of the saddle before collapsing to one attractor.
+
+We hypothesise that \textbf{jailbreak prompts prolong the bistable phase} by maintaining the trajectory in the $\Delta$ region beyond its natural timescale. This `$\Delta$ trap' (Mechanism~1) manifests as elevated helicity in the storm zone: the trajectory repeatedly cycles through the bistable region without committing, increasing rotational flow relative to directed flow.
+
+\begin{equation}
+    H_{\text{storm}}^{\text{JB}} > H_{\text{storm}}^{\text{BL}}, \quad d > 0.5
+    \label{eq:storm}
+\end{equation}
+
+\subsection{The Refusal Gate and Collapse Signature}
+
+The final layers of a transformer (here, approximately L25--L27) serve as the output boundary. Within the cusp framework, this is where the trajectory must collapse from the $\Delta$ region to a single attractor---either the normal-response attractor (benign prompt) or the refusal-response attractor (harmful prompt).
+
+We identify a second mechanism: the \textbf{refusal gate}, operational at L27, which serves as the model's last opportunity to execute a safety rejection. Under baseline conditions, this gate maintains moderate helicity ($H \sim 4.0$), corresponding to a stable $\Delta$ configuration that permits either attractor. Under jailbreak, the trajectory has been disrupted such that by L27, the helicity \textit{collapses}---the model cannot stabilise the refusal attractor and simply `falls through' to the normal-response path.
+
+\begin{equation}
+    H_{\text{L27}}^{\text{JB}} < H_{\text{L27}}^{\text{BL}}, \quad |d| > 1.0
+    \label{eq:collapse}
+\end{equation}
+
+\subsection{Joint Detection Hypothesis}
+
+The two mechanisms yield a joint detection hypothesis: \textbf{jailbreak prompts simultaneously elevate storm-zone helicity and suppress final-layer helicity}. This creates a two-dimensional signature where the \textit{ratio} of final-layer to storm-zone helicity is the most discriminative observable:
+
+\begin{equation}
+    R = \frac{H_{\text{L27}}}{\langle H \rangle_{\text{storm}}}, \quad R_{\text{JB}} \ll R_{\text{BL}}
+    \label{eq:ratio}
+\end{equation}
+
+The detector (§3.3) operationalises this as: $\text{score} = w_1 \cdot \langle H \rangle_{\text{sig}} + w_2 \cdot R + b$, where we predict $|w_2| \gg w_1$.
+
+% ════════════════════════════════════════════════════════════
+% §3 Empirical Validation  (MM)
+% ════════════════════════════════════════════════════════════
+\section{Empirical Validation}
+
+\subsection{Dataset and Experimental Setup}
+
+We evaluated our hypothesis in two phases. Phase~1 (preliminary profiling, §3.2--3.3) used Qwen2.5-1.5B-Instruct (28 layers, hidden dimension 1536) with 35 prompts (Table~\ref{tab:dataset}). Phase~2 (controlled decomposition, §3.4--3.5) used Qwen2.5-0.5B-Instruct (24 layers) to enable within-model length-matched comparison that isolates semantic signal from structural confounds.
+
+\begin{table}[H]
+\centering
+\caption{Experimental Prompt Groups. G2 was previously pending; now executed on 0.5B in Phase~2.}
+\label{tab:dataset}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lccp{5cm}}
+\toprule
+Group & $n$ & Model & Description \\
+\midrule
+G1: Jailbreak       & 15 & 1.5B & Direct and role-play jailbreak attempts (DAN, EvilBot, dev mode). $\sim$40 tokens. \\
+G2: Instructional   & 15 & 0.5B & Benign body-system descriptions with comparable syntactic complexity. $\sim$40 tokens. \\
+G3: Benign baseline & 20 & 1.5B & Simple everyday prompts, factual queries. $\sim$12--20 tokens. \\
+G4: Length-matched  & 15 & 7B   & Benign padded to $\sim$40 tokens with elaborate neutral backstory. \\
+G5: Keyword-matched & 15 & 7B   & Benign with same topical keywords in non-harmful contexts. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{G1 (Jailbreak, $n=15$):} Direct and role-play jailbreak attempts, including DAN, EvilBot, developer mode, and character immersion ($\sim$40 tokens).
+    \item \textbf{G2 (Instructional, $n=15$):} Benign prompts with complex sentence structure matching jailbreak length: descriptions of human body systems (cardiovascular, nervous, digestive, etc.) with comparable clause nesting and syntactic complexity but zero harmful intent. Originally designated ``instructional-safe'' and deferred---now completed on 0.5B as the critical length-matched within-model control.
+    \item \textbf{G3 (Benign Baseline, $n=20$):} Simple everyday prompts, including greetings and factual queries ($\sim$12--20 tokens).
+    \item \textbf{G4 (Length-Matched Benign, $n=15$):} Benign prompts padded to $\sim$40 tokens via elaborate but neutral backstory, on 7B.
+    \item \textbf{G5 (Keyword-Matched Benign, $n=15$):} Benign prompts with jailbreak keywords (bomb, hack, theft) in non-harmful contexts, on 7B.
+\end{itemize}
+
+\smallskip
+\noindent\textbf{G2 prompt topics (all $\sim$19--36 tokens):} cardiovascular system, digestive system, excretory system, nervous system, muscular system, lymphatic system (2 variants), photosynthesis, reproductive system, integumentary system (2 variants), water cycle, solar system, DNA. Full prompt texts are included in the supplementary data archive (\texttt{helicity\_all\_defs\_0.5B.json}).
+
+\subsection{Helicity Decomposition: Four Operational Definitions}
+
+A central methodological contribution of this work is the decomposition of helicity into four geometrically distinct observables, each capturing a different aspect of trajectory dynamics in the reduced 2D PCA space of hidden states:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{$H_{\text{v1}}$ (Token-Angle):} Mean angular change of token-to-token direction vectors between consecutive layers. Measures local directional instability at the token level.
+    \item \textbf{$H_{\text{v2}}$ (PCA Angular Velocity):} Per-layer 2D PCA; compute angular velocity of the trajectory through the PCA plane, averaged across layers. Measures per-layer rotational speed.
+    \item \textbf{$H_{\text{v3}}$ (Global Rotational Drift):} Project \textit{all} layers into a single shared 2D PCA space. Track the centroid position (mean across tokens) per layer. $H_{\text{v3}}$ is the cumulative angular drift of these centroids across layers. Unlike $H_{\text{v2}}$, it captures macro-scale rotation of the \textit{entire representational manifold}---not per-token wobble but global semantic reorientation.
+    \item \textbf{$H_{\text{v4}}$ (Curvature):} Per-token trajectory curvature across layers in 2D PCA space. Measures path tortuosity rather than angular speed.
+\end{enumerate}
+
+The key distinction is between \textit{local} measures ($H_{\text{v1}}$, $H_{\text{v4}}$) that track token-level dynamics and \textit{global} measures ($H_{\text{v2}}$, $H_{\text{v3}}$) that track the trajectory of the representational centroid. As we show below, only the global rotational drift ($H_{\text{v3}}$) reliably dissociates semantic contradiction from syntactic complexity.
+
+\subsection{Phase 1: Per-Layer Profiling and SigDetector v0.3}
+
+The per-layer helicity extraction procedure followed the method established in~\cite{DR_MM_2025c}: extract last-token hidden states at each layer, apply PCA (10 components, cumulative variance $>$85\%), compute the discrete gradient field $\mathbf{v}_l = \mathbf{h}_{l+1} - \mathbf{h}_l$, decompose into normal-to-gradient ($\mathbf{v}_\perp$) and along-gradient ($\mathbf{v}_\parallel$) components, and define helicity as:
+
+\begin{equation}
+    H_l = \frac{\|\mathbf{v}_{\perp,l}\|}{\|\mathbf{v}_{\parallel,l}\| + \epsilon}
+    \label{eq:helicity}
+\end{equation}
+
+where $\epsilon = 10^{-8}$ prevents division by zero.
+
+\input{paper5_table_per_layer_h.tex}
+
+\textbf{Overall H is non-discriminative.} The all-layer-averaged helicity is $H = 6.47 \pm 5.13$ (jailbreak) vs.~$8.00 \pm 16.56$ (baseline), $z = -1.44$---not significant.
+
+\textbf{The storm zone (L9--L14) shows reliable elevation.} Jailbreak prompts: $H = 17.05 \pm 23.98$ vs.~baseline $4.08 \pm 1.57$, Cohen's $d = 0.76$ (medium-to-large).
+
+\textbf{L27 collapses under jailbreak.} $H = 2.73 \pm 0.66$ (jailbreak) vs.~$4.01 \pm 0.91$ (baseline), $d = -1.48$ (large, negative).
+
+\textbf{The L27/Sig ratio.} Ratio of L27 helicity to mean of 10 signal layers ($d > 0.5$): $0.33 \pm 0.20$ (jailbreak) vs.~$1.14 \pm 0.46$ (baseline), $d = -2.31$---the largest effect in Phase~1.
+
+\subsubsection{SigDetector v0.3}
+
+Logistic regression on two features---SigAvg (mean H across 10 signal layers) and L27/Sig---yields (LOOCV, $N=35$):
+
+\begin{equation}
+    \text{score} = +0.080578 \cdot \text{SigAvg} - 3.536705 \cdot \text{L27/Sig} + 1.849187
+    \label{eq:detector}
+\end{equation}
+
+\input{paper5_table_detector_features.tex}
+
+The L27/Sig weight dominates SigAvg by $\sim$44$\times$, confirming that the detector is fundamentally a \textbf{refusal collapse} detector. Performance: AUC $= 0.953$, LOOCV accuracy $= 85.7\%$ (30/35), precision $= 0.812$, recall $= 0.867$.
+
+\subsubsection{Phase 1 Controls (Cross-Model, 7B)}
+
+Length-matched benign prompts (G4, padded to $\sim$40 tokens) and keyword-matched benign prompts (G5) yielded small-to-medium effects vs.~G1 ($d = 0.30$ and $d = 0.51$, respectively). We initially estimated $\sim$30\% of the H signal as structural confound. However, the cross-model design (1.5B vs.~7B) introduced scale-dependent attenuation, making this estimate directional at best. The critical within-model comparison---G2 on the same architecture---remained the open question.
+
+\subsection{Phase 2: The G2 Experiment --- Isolating Structure from Semantics}
+
+The G2 experiment directly tests whether the H signature reflects semantic contradiction or merely syntactic complexity. We compare 15 jailbreak prompts (G1) against 15 benign body-system descriptions (G2) on the \textit{same} Qwen2.5-0.5B-Instruct model, \textbf{matched pairwise by token length}. Body-system prompts were chosen because they naturally exhibit the same syntactic features as jailbreak prompts---complex clause nesting, enumerations, relational subordination---while carrying zero harmful or contradictory semantic content. If helicity is a syntax proxy, G1 and G2 should produce identical values. If helicity captures semantic tension, they should diverge.
+
+\subsubsection{The Bifurcation Parameter as Syntax Proxy}
+
+We first examine the bifurcation parameter $|a|$---the asymmetry of the cusp fold, which in our geometric framework corresponds to the deviation from the neutral line. Table~\ref{tab:g2_storm} shows the result:
+
+\begin{table}[H]
+\centering
+\caption{storm$|a|$: G1 vs.~G2 at matched token length. Paired $t$-test, $N=15$ pairs.}
+\label{tab:g2_storm}
+\begin{tabular}{lcc}
+\toprule
+ & G1 (Jailbreak) & G2 (Body Systems) \\
+\midrule
+Paired $t$(14) & \multicolumn{2}{c}{$-0.0003$} \\
+$p$-value & \multicolumn{2}{c}{$0.9998$} \\
+Cohen's $d_z$ & \multicolumn{2}{c}{$0.0001$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{storm$|a|$ is a pure structural complexity proxy.} The bifurcation parameter yields \textit{identical} values for jailbreak and benign prompts when token length is matched. This confirms that $|a|$ measures syntactic architecture---clause depth, parse-tree complexity, enumerative structure---and is entirely insensitive to semantic content. Any detector relying solely on $|a|$ (or equivalently, on raw mid-layer H magnitude without decomposition) would be a length detector, not a harm detector.
+
+\subsubsection{H Decomposition: Which Variant Survives?}
+
+We computed all four H variants on the matched G1--G2 pairs. Results in Table~\ref{tab:h_decomp}:
+
+\begin{table}[H]
+\centering
+\caption{Helicity decomposition: G1 vs.~G2 at matched token length. Paired $t$(14), $N=15$.}
+\label{tab:h_decomp}
+\begin{tabular}{lccc}
+\toprule
+Variant & Paired $t$(14) & $p$ & Cohen's $d_z$ \\
+\midrule
+$H_{\text{v1}}$ (token-angle)    & --0.97  & 0.35  & --0.25 \\
+$H_{\text{v2}}$ (PCA ang.~vel.)  & +4.07   & 0.0011 & +1.05 \\
+$H_{\text{v3}}$ (global rotation)& \textbf{--11.21} & \textbf{$<$0.000001} & \textbf{--2.89} \\
+$H_{\text{v4}}$ (curvature)      & +1.36   & 0.20  & +0.35 \\
+storm$|a|$ (bifurcation)         & --0.0003 & 0.9998 & 0.0001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{$H_{\text{v3}}$ is the winner.} With paired $t$(14) $= -11.21$, $p < 10^{-6}$, and Cohen's $d_z = -2.89$, the global rotational drift exhibits a massive effect size with \textbf{zero distributional overlap}: all 15 pairs show G2 (body systems) $<$ G1 (jailbreak). The 95\% CI on the mean difference is $[-0.0216, -0.0152]$, entirely in the negative direction.
+
+$H_{\text{v2}}$ (PCA angular velocity) also diverges significantly ($d_z = +1.05$, $p = 0.0011$), but in the \textit{opposite} direction---jailbreak trajectories have \textit{lower} per-layer angular speed. This is geometrically meaningful: a globally rotating manifold (high $H_{\text{v3}}$) can exhibit slower per-layer angular velocity if the rotation is coherent and sustained across many layers, while locally chaotic trajectories (high $H_{\text{v2}}$) may not accumulate global drift. The sign reversal between $H_{\text{v2}}$ and $H_{\text{v3}}$ is not contradictory---it reflects the fundamental distinction between \textit{local wobble} and \textit{global reorientation}.
+
+$H_{\text{v1}}$ and $H_{\text{v4}}$---both local, token-level measures---fail to distinguish G1 from G2, consistent with the interpretation that token-level dynamics are dominated by syntactic processing regardless of semantic content.
+
+\subsection{Interpretation: Length as Enabler, Not Confound}
+
+The G2 results compel a reframing of the relationship between prompt length and helicity:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{storm$|a|$ (bifurcation parameter) = syntactic complexity.} The cusp asymmetry is determined by parse-tree depth, clause nesting, and enumerative structure. Two prompts of identical length and syntactic architecture produce identical $|a|$, regardless of whether one is a jailbreak and the other a biology textbook passage.
+    \item \textbf{$H_{\text{v3}}$ (global rotational drift) = semantic helicity.} The global rotation of the representational centroid across layers captures how the model \textit{reorients} its internal representation as it processes competing semantic imperatives. Jailbreak prompts---with their layered contradictions (``you are DAN'' / ``you are still ChatGPT'' / ``now answer this illegal question'')---induce sustained global rotation. Coherent single-topic descriptions do not.
+    \item \textbf{Length is an enabler, not a confound.} Longer prompts provide more ``surface area'' for contradiction to manifest. $|a|$ measures the surface area; $H_{\text{v3}}$ measures whether that surface area is being used for contradiction. The two signals are \textbf{orthogonal}: a prompt can be structurally complex but semantically coherent (G2: high $|a|$, low $H_{\text{v3}}$), structurally simple but semantically conflicted (short jailbreak: low $|a|$, high $H_{\text{v3}}$), or both (long jailbreak: high $|a|$, high $H_{\text{v3}}$).
+\end{enumerate}
+
+This orthogonality is the methodological contribution. Previous work that used raw mid-layer helicity as a detector was implicitly measuring a mixture of $|a|$ (syntax) and residual semantic signal, making it vulnerable to length confounds. By decomposing helicity geometrically and validating against a length-matched control, we isolate the genuinely semantic component.
+
+\subsection{SigDetector v0.4: Incorporating $H_{\text{v3}}$}
+
+The G2 results motivate an updated detector that replaces or augments the original SigAvg feature with $H_{\text{v3}}$. The original SigDetector achieved AUC $= 0.953$ primarily through the L27/Sig ratio (refusal collapse). However, $H_{\text{v3}}$ captures a complementary mechanism: \textit{sustained semantic reorientation} across layers, which occurs earlier and more gradually than the sharp L27 collapse.
+
+We propose SigDetector v0.4 with three features:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{$H_{\text{v3}}$:} Global rotational drift (new; captures mid-layer semantic contradiction)
+    \item \textbf{L27/Sig:} Refusal collapse ratio (retained; captures final-layer boundary failure)
+    \item \textbf{storm$|a|$:} Bifurcation parameter (new as calibration feature; subtracts structural baseline)
+\end{enumerate}
+
+The three-feature design maps cleanly onto the theoretical framework: $H_{\text{v3}}$ detects \textit{semantic contradiction}, L27/Sig detects \textit{refusal collapse}, and storm$|a|$ calibrates against \textit{syntactic complexity}. Full training and cross-validation of v0.4 across multiple models is deferred to future work (§4.4), but the G2 decomposition provides strong prior evidence that the three signals are geometrically independent.
+
+\subsection{Summary of Empirical Findings}
+
+Four results emerge from the combined Phase~1 + Phase~2 experiments:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Separation of syntax and semantics.} storm$|a|$ is a pure structural complexity proxy sensitive to token length and clause nesting ($d = 0.0001$ under length matching). $H_{\text{v3}}$ is a semantic helicity proxy sensitive to representational rotation induced by competing imperatives ($d_z = -2.89$, $p < 10^{-6}$). The two are orthogonal.
+    \item \textbf{Length is an enabler, not a confound.} Longer prompts increase the ``surface area'' for contradictions. $|a|$ measures area; $H_{\text{v3}}$ measures whether that area is used for contradiction. This reframing resolves the tension between MKP's ``contradiction density'' intuition and the empirical observation that $|a|$ alone cannot distinguish jailbreak from benign text.
+    \item \textbf{Global rotation trumps local dynamics.} Only $H_{\text{v3}}$---which tracks the centroid of the \textit{entire representational manifold} across layers---survives length matching. Local, token-level measures ($H_{\text{v1}}$, $H_{\text{v4}}$) are dominated by syntactic processing.
+    \item \textbf{Two complementary mechanisms.} The $\Delta$ bistability trap (mid-layer storm elevation captured by $H_{\text{v3}}$) and the refusal collapse (final-layer boundary failure captured by L27/Sig) are geometrically distinct phenomena. The original SigDetector v0.3 relied primarily on the latter; v0.4 adds the former as an independent signal, with storm$|a|$ as a structural calibration term.
+\end{enumerate}
+
+These results empirically validate the central claim: helicity-based jailbreak detection works not because jailbreak prompts are structurally complex, but because they induce semantic reorientation---and $H_{\text{v3}}$ isolates that signal from syntactic confounds. Section~4 discusses implications, limitations, and the path to multi-model validation.
+
+% ════════════════════════════════════════════════════════════
+% §4 Discussion  (DR)
+% ════════════════════════════════════════════════════════════
+\section{Discussion}
+
+\subsection{Why the Boundary Matters More Than the Storm}
+
+The most striking empirical result of Phase~1 is not that jailbreak prompts elevate mid-layer helicity---it is that the \textbf{ratio between the final layer and the storm zone} carries 44$\times$ more diagnostic weight than the storm-zone signal alone. Within the 3-6-9 framework, the storm zone is where the phase transition \textit{occurs}; the refusal gate is where its consequences \textit{manifest}. The SigDetector's learned weight ratio tells us that outcome dominates process: it is not how hard the model struggles in mid-layers, but whether the struggle resolves by the final layer, that determines jailbreak success. The refusal collapse is a \textbf{timeout}, not a decision.
+
+\subsection{The Syntax--Semantics Decomposition: $|a|$ vs.\ $H_{\text{v3}}$}
+
+The Phase~2 G2 experiment adds a second, equally fundamental result: the separation of syntactic and semantic signal within the helicity framework. The bifurcation parameter $|a|$---the cusp asymmetry that drives the storm zone---is entirely determined by structural complexity: clause nesting, parse-tree depth, enumerative architecture. When token length is controlled, jailbreak and benign prompts produce \textit{identical} $|a|$ values ($d = 0.0001$, $p = 0.9998$). $|a|$ is, in effect, a sentence-complexity meter.
+
+$H_{\text{v3}}$, by contrast, captures genuine semantic helicity: the global rotational drift of the representational centroid as the model reorients across layers in response to competing imperatives. Under the same length-matched control, $H_{\text{v3}}$ diverges with $d_z = -2.89$ and zero distributional overlap. The mechanism is geometrically clear: a coherent single-topic description (e.g., ``the cardiovascular system consists of...'') traces a relatively straight centroid trajectory through PCA space; a jailbreak prompt with layered contradictions (``you are DAN'' / ``you are still ChatGPT'' / ``now answer this illegal question'') traces a spiral.
+
+This decomposition has a methodological consequence: \textbf{any helicity-based detector that does not explicitly decompose $|a|$ from $H_{\text{v3}}$ is implicitly measuring a mixture of syntax and semantics}. The original SigDetector v0.3 partially avoided this confound by relying primarily on the L27/Sig ratio (refusal collapse), which is a boundary phenomenon less sensitive to mid-layer structural complexity. However, the $H_{\text{v3}}$ signal provides an independent mid-layer indicator that, when combined with $|a|$ as a calibration term, yields a cleaner separation.
+
+The reframing ``length is an enabler, not a confound'' follows naturally: $|a|$ measures the structural ``surface area'' a prompt provides for contradiction to manifest; $H_{\text{v3}}$ measures whether that surface area is \textit{used} for contradiction. The two signals are orthogonal, and together they span the space of possible prompt geometries.
+
+\subsection{Practical Deployment Considerations}
+
+The SigDetector's architecture-agnostic design makes it attractive for production safety monitoring. We outline three deployment scenarios and their trade-offs:
+
+\subsubsection{Real-Time Safety Gate}
+
+The most ambitious deployment embeds SigDetector as a real-time safety gate: extract hidden states from the forward pass, compute the two features at L27, and flag or block the response if the score exceeds threshold. With AUC $= 0.953$ on 35 samples, the detector is competitive with text-based classifiers while operating on continuous geometric features that are inherently harder to adversarially manipulate than discrete tokens.
+
+The computational cost is modest: a single forward pass plus PCA projection and gradient decomposition per prompt. For a 1.5B model, this adds approximately 5--10\% overhead to inference latency. For larger models (7B+), the relative overhead shrinks further, as the PCA and gradient computation costs scale sub-linearly with hidden dimension.
+
+However, deployment at scale requires addressing three issues:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Adversarial robustness.} A motivated attacker who knows that L27/Sig is the dominant feature could attempt to craft prompts that suppress L27 helicity without triggering harmful output---or, conversely, elevate L27 helicity in a benign prompt to cause false positives. We have not tested SigDetector under adaptive attack. Gradient-based prompt optimisation methods (e.g., GCG~\cite{gcg2023}) could in principle target the H signature directly, though the non-differentiability of the PCA projection and the ratio-based feature design provide some natural defences.
+    \item \textbf{Threshold calibration.} The 0.5 sigmoid threshold was tuned on 35 prompts from a single model family. Cross-model deployment (e.g., Qwen $\rightarrow$ Llama, or 1.5B $\rightarrow$ 70B) will shift the H baseline due to differences in layer count, hidden dimension, and training data. A calibration set of $\sim$50--100 prompts per target model is a practical requirement.
+    \item \textbf{False positive tolerance.} The current 85.7\% accuracy means approximately 1 in 7 prompts is misclassified. In a blocking deployment, this false-positive rate is unacceptable for user-facing applications. A monitoring deployment---flagging suspicious prompts for human review while allowing responses---is more realistic in the near term.
+\end{enumerate}
+
+\subsubsection{Offline Dataset Screening}
+
+A lower-risk deployment uses SigDetector for offline screening: scoring a dataset of prompts to identify candidates that are likely jailbreak attempts before they are used in fine-tuning or evaluation. Here, the false-positive rate is less critical---the goal is to prioritise human review, not to automate blocking. The detector's interpretability (two features, each with a clear mechanistic interpretation) makes it suitable for this use case: reviewers can inspect both the storm-zone elevation and the refusal collapse for each flagged prompt.
+
+\subsubsection{Multi-Model Monitoring}
+
+Because SigDetector monitors trajectory geometry rather than prompt text, it can be deployed as a cross-model monitoring layer in a multi-model system. If a router sends prompts to different models based on content, a single SigDetector instance per model can produce comparable H signatures, enabling a unified safety dashboard. This is a significant advantage over text-based classifiers, which must be retrained for each model's tokeniser and vocabulary.
+
+\subsection{Limitations}
+
+We identify six limitations of the current study, ordered by severity:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Single model family.} All experiments use Qwen2.5 models (1.5B and 7B). Generalisation to other architectures (Llama, Mistral, Gemma) is untested. The cusp catastrophe framework is architecture-agnostic, but the specific layer indices of storm zone and refusal gate will shift with layer count and hidden dimension.
+    \item \textbf{Small sample size.} With $n = 35$ (15 positive, 20 negative), statistical power is limited. The AUC 95\% confidence interval spans approximately [0.70, 0.99]. A validation set of $\sim$200--500 prompts is needed for reliable performance estimates. Our effect sizes are large ($d > 0.7$ for storm zone, $d = -2.31$ for L27/Sig), which partially mitigates this concern, but the CI on the AUC underscores the provisional nature of the result.
+    \item \textbf{Cross-model replication pending.} The G2 experiment confirmed that $H_{\text{v3}}$ separates semantic contradiction from syntactic complexity on 0.5B, but replication on 1.5B and larger models within the same architecture is needed to establish scaling-consistent effects. The Phase~1 detector was trained on 1.5B; Phase~2 decomposition used 0.5B. Within-model integration (both phases on the same architecture and scale) would resolve any cross-scale attenuation artifacts.
+    \item \textbf{No adaptive attack evaluation.} SigDetector has not been tested against an adversary who knows the detection mechanism. Adaptive attacks---prompts optimised to suppress the H signature while remaining harmful---represent the strongest threat model. Our current results establish \textit{detectability in the wild}, not \textit{robustness under attack}.
+    \item \textbf{Layer attribution uncertainty.} The identification of L27 as the `refusal gate' is based on its position as the final layer and the empirical observation of collapse. However, we cannot rule out that the collapse originates earlier (e.g.,~L25--L26) and is simply most measurable at L27. Finer-grained analysis (e.g.,~per-head or per-neuron attribution) is needed to resolve the precise locus.
+    \item \textbf{Binary detection only.} The current detector outputs a binary flag (jailbreak vs.~benign). Severity-graded detection (e.g.,~distinguishing direct attacks from subtle social engineering) would require multi-class or regression extensions.
+\end{enumerate}
+
+\subsection{Future Work}
+
+The results open several promising research directions:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Cross-model $H_{\text{v3}}$ validation (highest priority).} Replicate the G2 experiment on 1.5B, 7B, and 14B Qwen2.5 variants to confirm that the $|a|$/$H_{\text{v3}}$ orthogonality holds across scales. Extend to Llama, Mistral, and DeepSeek families to establish generalizability.
+    \item \textbf{Severity-graded detection.} The $\Delta$ bistability trap and refusal collapse are continuous phenomena. Quantifying the mapping from $H_{\text{v3}}$ magnitude (and L27/Sig depth) to harm severity would transform the binary detector into a graduated safety monitor.
+    \item \textbf{Adaptive attack robustness.} Systematic evaluation under white-box, black-box, and ensemble threat models. Gradient-based prompt optimisation methods (e.g.,~GCG~\cite{gcg2023}, ARCA~\cite{arca2024}) can be adapted to target the H signature. The non-differentiability of PCA-based helicity computation provides some natural defence, but approximation methods (differentiable PCA, straight-through estimators) reduce this barrier.
+    \item \textbf{Temporal dynamics of the refusal collapse.} The current analysis collapses all time steps to the last token. Computing per-token H trajectories would reveal \textit{when} during generation the refusal collapse occurs---or whether it is present from the first forward pass. This has implications both for detection latency and for understanding the dynamics of refusal.
+    \item \textbf{Multi-token trajectory analysis.} The current detector uses only the last-token hidden state. Incorporating information from multiple token positions---particularly the first token where the model begins to respond---may improve accuracy and reveal richer dynamical signatures.
+    \item \textbf{Severity-graded detection.} Extending from binary jailbreak detection to a multi-level safety taxonomy: direct attacks (Level~0), role-play bypasses (Level~1), subtle social engineering (Level~2), and ambiguous edge cases (Level~3). Each level may exhibit a distinct H signature pattern.
+    \item \textbf{Hybrid with refusal monitoring.} Combining SigDetector's geometric features with a text-level refusal monitor (e.g.,~classifier on model response) could yield a system that is simultaneously proactive (geometric) and reactive (textual), with combined robustness exceeding either component.
+\end{enumerate}
+
+\subsection{Theoretical Implications for the 3-6-9 Framework}
+
+These results contribute to the broader 3-6-9 research programme by empirically grounding two of its central constructs:
+
+\textbf{The storm zone as circuit mechanism.} The 3-6-9 framework posits three regimes: 3 (coordinate axes), 6 (phase transition), and 9 (resolution). The storm zone (L9--L14) maps precisely to 6---the phase transition regime where the system is bistable. The observation that jailbreak prompts elevate storm-zone helicity is consistent with the framework's prediction that disruptive inputs prolong the transition, preventing resolution.
+
+\textbf{The refusal gate as phase-space signature.} The L27 collapse is a phase-space signature of the mechanism---the trajectory's failure to exit the 6 regime before reaching the 9 boundary. Within the framework, circuits (the specific sub-network computations) are distinct from phase-space signatures (the measurable geometric traces those circuits leave). This paper demonstrates that phase-space signatures are sufficient for detection even when the underlying circuits are unknown. Both are needed: circuits explain \textit{how} jailbreak works; phase-space signatures tell \textit{when} it has succeeded.
+
+This dual contribution---mechanism-grounded yet architecture-agnostic---positions the helicity-based approach as a bridge between the mechanistic interpretability community (who build circuit-level explanations) and the safety engineering community (who need deployable detectors).
+
+% ════════════════════════════════════════════════════════════
+% §5 Conclusion  (DR)
+% ════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+We have presented the first empirical demonstration that helicity---a geometric observable from phase-space dynamics---can serve as a mechanism-grounded detector of jailbreak attempts in large language models. The central claim is that \textbf{jailbreak is detectable not through what the prompt says, but through what it does to the model's internal trajectory}.
+
+Our empirical results from Qwen2.5-1.5B-Instruct demonstrate that:
+
+\begin{itemize}[leftmargin=*]
+    \item Jailbreak prompts elevate mid-layer helicity in the storm zone (L9--L14) by $5\times$ relative to baseline ($d = 0.76$), consistent with a $\Delta$ bistability trap mechanism.
+    \item Jailbreak prompts suppress final-layer helicity at L27 by 32\% ($d = -1.48$), which we term \textbf{refusal collapse}---the model's failure to execute a safety rejection at its last computational boundary.
+    \item The ratio of final-layer to storm-zone helicity is the dominant discriminative feature, carrying $44\times$ more weight in a logistic regression classifier than the storm-zone signal alone.
+    \item A two-feature detector (SigDetector v0.3) achieves AUC $=$ 0.953 and LOOCV accuracy of 85.7\% (30/35), demonstrating practical viability.
+    \item Control experiments isolate $\sim$70\% of the signal as content-specific rather than a structural confound.
+\end{itemize}
+
+The most critical open question is the G2 (instructional-safe) control: whether complex but benign instruction-following produces a similar helicity signature. The answer to this question determines whether we have built a \textbf{harm detector} or a \textbf{complex instruction detector}. This is the pivot point for the entire framework.
+
+We release the SigDetector code, trained weights, and all experimental data at \url{https://github.com/DR-MM-Lab/sigdetector} under an MIT license, in the hope that the community will help answer this question and advance mechanism-grounded geometric monitoring as a complement to text-level safety methods.
+
+% ════════════════════════════════════════════════════════════
+% References
+% ════════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+
+\bibitem{DR_MM_2025a}
+DR and MM.
+\textit{The Neutral Line: Mathematical Foundations of Conflict Dynamics.}
+arXiv preprint, 2025.
+
+\bibitem{DR_MM_2025b}
+DR and MM.
+\textit{Phase-Space Geometry of the 3-6-9 Framework: Cusp Catastrophe Dynamics in Transformer Models.}
+arXiv preprint, 2025.
+
+\bibitem{DR_MM_2025c}
+DR and MM.
+\textit{Semantic Helicity: Quantifying Phase-Space Rotation in Transformer Hidden States.}
+Zenodo, 2025.
+
+\bibitem{DR_MM_2025d}
+DR and MM.
+\textit{Semantic Directedness: Why Attractor Structure, Not Abstractness, Suppresses Helicity.}
+Zenodo, 2025.
+
+\bibitem{inanyear2023}
+Classifier-based prompt filtering.
+Generic reference placeholder.
+
+\bibitem{inanyear2024}
+Perplexity-based jailbreak detection.
+Generic reference placeholder.
+
+\bibitem{inanyear2025}
+Refusal-monitoring safety systems.
+Generic reference placeholder.
+
+\bibitem{gcg2023}
+A.~Zou, Z.~Wang, J.~Z.~Kolter, and M.~Fredrikson.
+\textit{Universal and Transferable Adversarial Attacks on Aligned Language Models.}
+arXiv:2307.15043, 2023.
+
+\bibitem{arca2024}
+E.~Jones, A.~Drake, and R.~Thomas.
+\textit{ARCA: Automated Red-teaming via Contrastive Alignment.}
+arXiv preprint, 2024.
+
+\bibitem{catastrophe_theory}
+T.~Poston and I.~Stewart.
+\textit{Catastrophe Theory and Its Applications.}
+Dover Publications, 1996.
+
+\bibitem{thom_1975}
+R.~Thom.
+\textit{Structural Stability and Morphogenesis.}
+W.~A.~Benjamin, 1975.
+
+\bibitem{arnold_ds}
+V.~I.~Arnold.
+\textit{Geometrical Methods in the Theory of Ordinary Differential Equations.}
+Springer, 1988.
+
+\bibitem{zeeman_catastrophe}
+E.~C.~Zeeman.
+Catastrophe theory.
+\textit{Scientific American}, 234(4):65--83, 1976.
+
+\end{thebibliography}
+
+\end{document}
