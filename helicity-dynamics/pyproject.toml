@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "helicity-dynamics"
+version = "1.0.0"
+description = "Ô (O-hat): A cross-domain phase transition detector — curl, helicity, balance for any time series"
+readme = "README.md"
+license = {text = "CC BY 4.0"}
+authors = [
+    {name = "DR", email = "dr@qwenpaw.local"},
+    {name = "MKP"},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov", "matplotlib>=3.7"]
+all = ["helicity-dynamics[dev]"]
+
+[project.urls]
+Homepage = "https://github.com/MMDR10/H-Detector"
+Repository = "https://github.com/MMDR10/H-Detector/tree/main/ising_naf_paper"
+Documentation = "https://github.com/MMDR10/H-Detector/blob/main/ising_naf_paper/README.md"
+Zenodo = "https://zenodo.org/record/21442523"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+helicity_dynamics = ["py.typed"]
