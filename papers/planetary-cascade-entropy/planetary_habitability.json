@@ -1,0 +1,74 @@
+[
+  {
+    "name": "\ud83c\udf0d Earth (Keeling CO2)",
+    "category": "habitable",
+    "S_cascade": 0.625,
+    "dominant_order": "H \u2192 Balance \u2192 Curl",
+    "n_configs": 24,
+    "distribution": {
+      "H \u2192 Balance \u2192 Curl": 9,
+      "Curl \u2192 Balance \u2192 H": 4,
+      "Balance \u2192 H \u2192 Curl": 6,
+      "Balance \u2192 Curl \u2192 H": 2,
+      "H \u2192 Curl \u2192 Balance": 2,
+      "Curl \u2192 H \u2192 Balance": 1
+    }
+  },
+  {
+    "name": "\u2601\ufe0f  Venus (surface model)",
+    "category": "dead",
+    "S_cascade": 0.6666666666666667,
+    "dominant_order": "Curl \u2192 H \u2192 Balance",
+    "n_configs": 24,
+    "distribution": {
+      "Curl \u2192 Balance \u2192 H": 4,
+      "H \u2192 Balance \u2192 Curl": 4,
+      "Balance \u2192 H \u2192 Curl": 3,
+      "H \u2192 Curl \u2192 Balance": 5,
+      "Curl \u2192 H \u2192 Balance": 8
+    }
+  },
+  {
+    "name": "\u3030\ufe0f  Pure Sine Wave",
+    "category": "abiotic",
+    "S_cascade": 0.6666666666666667,
+    "dominant_order": "Curl \u2192 H \u2192 Balance",
+    "n_configs": 24,
+    "distribution": {
+      "Curl \u2192 Balance \u2192 H": 5,
+      "Balance \u2192 Curl \u2192 H": 6,
+      "Curl \u2192 H \u2192 Balance": 8,
+      "H \u2192 Balance \u2192 Curl": 2,
+      "H \u2192 Curl \u2192 Balance": 3
+    }
+  },
+  {
+    "name": "\ud83c\udfb2 Random Walk",
+    "category": "entropy",
+    "S_cascade": 0.7083333333333333,
+    "dominant_order": "Curl \u2192 Balance \u2192 H",
+    "n_configs": 24,
+    "distribution": {
+      "Curl \u2192 Balance \u2192 H": 7,
+      "Balance \u2192 H \u2192 Curl": 7,
+      "Balance \u2192 Curl \u2192 H": 5,
+      "Curl \u2192 H \u2192 Balance": 4,
+      "H \u2192 Balance \u2192 Curl": 1
+    }
+  },
+  {
+    "name": "\ud83e\udea8 Mars (Gale pressure model)",
+    "category": "dead",
+    "S_cascade": 0.7916666666666666,
+    "dominant_order": "Curl \u2192 Balance \u2192 H",
+    "n_configs": 24,
+    "distribution": {
+      "Curl \u2192 Balance \u2192 H": 5,
+      "H \u2192 Balance \u2192 Curl": 5,
+      "H \u2192 Curl \u2192 Balance": 3,
+      "Balance \u2192 H \u2192 Curl": 3,
+      "Balance \u2192 Curl \u2192 H": 4,
+      "Curl \u2192 H \u2192 Balance": 4
+    }
+  }
+]
