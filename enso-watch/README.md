@@ -2,17 +2,17 @@
 
 雙擊即睇。兩種玩法：🖥️ HTML 網頁版（手機都得）或 🐍 Python 命令列。
 
-## 係咩嚟？
+## 🌐 即時儀表板
 
-一個 Python 小程式，幫你睇實 El Niño / La Niña（聖嬰／反聖嬰）嘅最新狀態。分析 NOAA 75 年歷史數據，用兩個數學方法偵測異常信號。
-
-**適合：** 漁民、沿海居民、農民、任何受 ENSO 影響嘅人。
+👉 **[📊 打開 ENSO 儀表板](https://htmlpreview.github.io/?https://github.com/MMDR10/H-Detector/blob/main/enso-watch/enso_dashboard.html)** 👈
 
 ## 點用？
 
 ### 🖥️ 網頁版（推薦 — 零門檻）
 
 **雙擊 `enso_dashboard.html`** 就得！手機、平板、電腦全部支援。唔使裝任何嘢。
+
+或者直接上網開：[enso_dashboard.html](https://htmlpreview.github.io/?https://github.com/MMDR10/H-Detector/blob/main/enso-watch/enso_dashboard.html)
 
 你會睇到：
 - 🟢🟡🔴 巨型預警燈
