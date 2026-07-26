@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌊 ENSO Watch — 聖嬰預警儀表板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0a0e17;color:#e0e6f0;min-height:100vh;display:flex;justify-content:center;padding:16px}
+.dashboard{max-width:640px;width:100%}
+.header{text-align:center;padding:24px 0 8px}
+.header h1{font-size:1.6rem;font-weight:700;color:#fff}
+.header .sub{font-size:.85rem;color:#6b7280;margin-top:4px}
+.card{background:#111827;border-radius:16px;padding:20px;margin-bottom:14px;border:1px solid #1f2937}
+.card-title{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:12px}
+.warning-box{text-align:center;padding:28px 20px}
+.warning-light{font-size:4rem;margin-bottom:8px}
+.warning-level{font-size:1.4rem;font-weight:700;margin-bottom:4px}
+.warning-detail{font-size:.85rem;color:#9ca3af;line-height:1.5}
+.oni-big{font-size:3.2rem;font-weight:800;text-align:center;padding:8px 0}
+.oni-label{text-align:center;font-size:.85rem;color:#6b7280}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{background:#1a2235;border-radius:10px;padding:14px;text-align:center}
+.metric .val{font-size:1.6rem;font-weight:700}
+.metric .lbl{font-size:.7rem;color:#6b7280;margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1f2937;font-size:.85rem}
+.row:last-child{border-bottom:none}
+.row .badge{padding:3px 10px;border-radius:12px;font-size:.75rem;font-weight:600}
+.badge-red{background:#7f1d1d;color:#fca5a5}
+.badge-yellow{background:#78350f;color:#fcd34d}
+.badge-green{background:#064e3b;color:#6ee7b7}
+canvas{width:100%;height:180px;display:block}
+.footer{text-align:center;padding:16px 0 32px;font-size:.7rem;color:#4b5563}
+.footer a{color:#6b7280}
+.pos{color:#22c55e}.neg{color:#ef4444}.warn{color:#f59e0b}
+</style>
+</head>
+<body>
+<div class="dashboard">
+<div class="header">
+<h1>🌊 ENSO Watch</h1>
+<div class="sub">聖嬰／反聖嬰 幾何預警儀表板 · NOAA ONI 數據</div>
+</div>
+
+<div class="card warning-box" id="warning-card">
+<div class="warning-light" id="wl-icon">🟡</div>
+<div class="warning-level" id="wl-text">黃色 — 注意</div>
+<div class="warning-detail" id="wl-detail"></div>
+</div>
+
+<div class="card">
+<div class="card-title">🌡️ 最新 ONI 指數</div>
+<div class="oni-big" id="oni-val">—</div>
+<div class="oni-label" id="oni-date">—</div>
+<div style="margin-top:12px" id="oni-desc" class="warning-detail"></div>
+</div>
+
+<div class="metrics">
+<div class="metric"><div class="val" id="m-dh">—</div><div class="lbl">Core-Shell ΔH</div></div>
+<div class="metric"><div class="val" id="m-inv">—</div><div class="lbl">歷史反轉率</div></div>
+<div class="metric"><div class="val" id="m-phase">—</div><div class="lbl">當前階段</div></div>
+<div class="metric"><div class="val" id="m-sig">—</div><div class="lbl">異常信號數</div></div>
+</div>
+
+<div class="card">
+<div class="card-title">📈 Core-Shell ΔH 歷史趨勢</div>
+<canvas id="dh-chart"></canvas>
+<div style="font-size:.7rem;color:#6b7280;text-align:center;margin-top:4px">紅色 = ΔH&lt;0 (反轉) · 每個點 = 3年窗口</div>
+</div>
+
+<div class="card">
+<div class="card-title">📊 近 3 年 ONI 走勢</div>
+<canvas id="oni-chart"></canvas>
+</div>
+
+<div class="card">
+<div class="card-title">📖 點睇呢個儀表板？</div>
+<div style="font-size:.82rem;line-height:1.7;color:#9ca3af">
+<p>🟢 <b>綠色</b> — 一切正常。深層結構穩定，冇異常信號。</p>
+<p>🟡 <b>黃色</b> — 有一個異常信號。Core-Shell 反轉（ΔH&lt;0）表示系統深層結構出現變化。歷史上 1996 年中出現過同類信號，6 個月後就係 1997 超級聖嬰。建議關注未來 3-6 個月。</p>
+<p>🔴 <b>紅色</b> — 兩個信號同時異常。強烈建議密切關注。</p>
+<p style="margin-top:8px">⚠️ 呢個係<b>研究工具</b>，唔係官方預報。請參考當地氣象局。</p>
+</div>
+</div>
+
+<div class="footer">
+數據來源：NOAA Climate Prediction Center · 方法：Ô-HAT 幾何相空間診斷<br>
+<a href="https://github.com/MMDR10/H-Detector/tree/main/enso-watch" target="_blank">GitHub</a> · MIT License
+</div>
+</div>
+
+<script>
+// ═══════ EMBEDDED DATA ═══════
+const DATA = {"latest_oni": 0.98, "latest_date": "2026-05", "data_range": "1950-01 \u2192 2026-05", "windows": [{"start": "1950-01", "end": "1952-12", "mean_oni": -0.09, "delta_H": 1.0, "inverted": false, "H_core": 0.96, "H_shell": 1.96}, {"start": "1950-07", "end": "1953-06", "mean_oni": 0.22, "delta_H": 0.61, "inverted": false, "H_core": 0.96, "H_shell": 1.57}, {"start": "1951-01", "end": "1953-12", "mean_oni": 0.44, "delta_H": 0.75, "inverted": false, "H_core": 0.96, "H_shell": 1.72}, {"start": "1951-07", "end": "1954-06", "mean_oni": 0.44, "delta_H": 0.25, "inverted": false, "H_core": 1.02, "H_shell": 1.27}, {"start": "1952-01", "end": "1954-12", "mean_oni": 0.16, "delta_H": 0.63, "inverted": false, "H_core": 0.83, "H_shell": 1.46}, {"start": "1952-07", "end": "1955-06", "mean_oni": -0.01, "delta_H": 0.31, "inverted": false, "H_core": 0.77, "H_shell": 1.08}, {"start": "1953-01", "end": "1955-12", "mean_oni": -0.21, "delta_H": 0.46, "inverted": false, "H_core": 0.85, "H_shell": 1.3}, {"start": "1953-07", "end": "1956-06", "mean_oni": -0.43, "delta_H": 0.35, "inverted": false, "H_core": 0.82, "H_shell": 1.17}, {"start": "1954-01", "end": "1956-12", "mean_oni": -0.64, "delta_H": 0.38, "inverted": false, "H_core": 0.95, "H_shell": 1.33}, {"start": "1954-07", "end": "1957-06", "mean_oni": -0.55, "delta_H": 0.33, "inverted": false, "H_core": 0.83, "H_shell": 1.16}, {"start": "1955-01", "end": "1957-12", "mean_oni": -0.19, "delta_H": 0.9, "inverted": false, "H_core": 0.95, "H_shell": 1.85}, {"start": "1955-07", "end": "1958-06", "mean_oni": 0.13, "delta_H": 0.68, "inverted": false, "H_core": 0.87, "H_shell": 1.55}, {"start": "1956-01", "end": "1958-12", "mean_oni": 0.41, "delta_H": 1.41, "inverted": false, "H_core": 0.92, "H_shell": 2.33}, {"start": "1956-07", "end": "1959-06", "mean_oni": 0.58, "delta_H": 0.25, "inverted": false, "H_core": 0.9, "H_shell": 1.15}, {"start": "1957-01", "end": "1959-12", "mean_oni": 0.64, "delta_H": -0.05, "inverted": true, "H_core": 1.05, "H_shell": 1.0}, {"start": "1957-07", "end": "1960-06", "mean_oni": 0.56, "delta_H": 0.58, "inverted": false, "H_core": 1.2, "H_shell": 1.78}, {"start": "1958-01", "end": "1960-12", "mean_oni": 0.35, "delta_H": 0.43, "inverted": false, "H_core": 1.45, "H_shell": 1.88}, {"start": "1958-07", "end": "1961-06", "mean_oni": 0.17, "delta_H": 0.38, "inverted": false, "H_core": 0.98, "H_shell": 1.36}, {"start": "1959-01", "end": "1961-12", "mean_oni": 0.06, "delta_H": 0.36, "inverted": false, "H_core": 0.99, "H_shell": 1.34}, {"start": "1959-07", "end": "1962-06", "mean_oni": -0.04, "delta_H": 0.15, "inverted": false, "H_core": 0.89, "H_shell": 1.05}, {"start": "1960-01", "end": "1962-12", "mean_oni": -0.05, "delta_H": 0.19, "inverted": false, "H_core": 0.83, "H_shell": 1.02}, {"start": "1960-07", "end": "1963-06", "mean_oni": -0.03, "delta_H": 0.1, "inverted": false, "H_core": 0.98, "H_shell": 1.08}, {"start": "1961-01", "end": "1963-12", "mean_oni": 0.14, "delta_H": -0.29, "inverted": true, "H_core": 1.47, "H_shell": 1.18}, {"start": "1961-07", "end": "1964-06", "mean_oni": 0.13, "delta_H": 0.2, "inverted": false, "H_core": 1.21, "H_shell": 1.41}, {"start": "1962-01", "end": "1964-12", "mean_oni": 0.03, "delta_H": -0.17, "inverted": true, "H_core": 1.05, "H_shell": 0.88}, {"start": "1962-07", "end": "1965-06", "mean_oni": 0.09, "delta_H": 0.63, "inverted": false, "H_core": 0.9, "H_shell": 1.53}, {"start": "1963-01", "end": "1965-12", "mean_oni": 0.41, "delta_H": 0.72, "inverted": false, "H_core": 0.96, "H_shell": 1.68}, {"start": "1963-07", "end": "1966-06", "mean_oni": 0.52, "delta_H": 0.04, "inverted": false, "H_core": 0.94, "H_shell": 0.99}, {"start": "1964-01", "end": "1966-12", "mean_oni": 0.31, "delta_H": 0.62, "inverted": false, "H_core": 1.04, "H_shell": 1.66}, {"start": "1964-07", "end": "1967-06", "mean_oni": 0.24, "delta_H": 0.4, "inverted": false, "H_core": 1.13, "H_shell": 1.52}, {"start": "1965-01", "end": "1967-12", "mean_oni": 0.32, "delta_H": -0.19, "inverted": true, "H_core": 1.2, "H_shell": 1.02}, {"start": "1965-07", "end": "1968-06", "mean_oni": 0.25, "delta_H": -0.01, "inverted": true, "H_core": 1.22, "H_shell": 1.21}, {"start": "1966-01", "end": "1968-12", "mean_oni": 0.07, "delta_H": 0.08, "inverted": false, "H_core": 0.98, "H_shell": 1.06}, {"start": "1966-07", "end": "1969-06", "mean_oni": 0.07, "delta_H": 0.11, "inverted": false, "H_core": 0.93, "H_shell": 1.04}, {"start": "1967-01", "end": "1969-12", "mean_oni": 0.19, "delta_H": 0.19, "inverted": false, "H_core": 0.87, "H_shell": 1.06}, {"start": "1967-07", "end": "1970-06", "mean_oni": 0.28, "delta_H": 0.05, "inverted": false, "H_core": 0.93, "H_shell": 0.98}, {"start": "1968-01", "end": "1970-12", "mean_oni": 0.19, "delta_H": 0.1, "inverted": false, "H_core": 0.86, "H_shell": 0.96}, {"start": "1968-07", "end": "1971-06", "mean_oni": 0.08, "delta_H": 0.43, "inverted": false, "H_core": 0.86, "H_shell": 1.29}, {"start": "1969-01", "end": "1971-12", "mean_oni": -0.17, "delta_H": 0.53, "inverted": false, "H_core": 0.88, "H_shell": 1.42}, {"start": "1969-07", "end": "1972-06", "mean_oni": -0.28, "delta_H": 0.21, "inverted": false, "H_core": 0.83, "H_shell": 1.03}, {"start": "1970-01", "end": "1972-12", "mean_oni": -0.11, "delta_H": 0.47, "inverted": false, "H_core": 0.91, "H_shell": 1.38}, {"start": "1970-07", "end": "1973-06", "mean_oni": -0.08, "delta_H": 0.07, "inverted": false, "H_core": 0.92, "H_shell": 0.99}, {"start": "1971-01", "end": "1973-12", "mean_oni": -0.21, "delta_H": 0.16, "inverted": false, "H_core": 0.87, "H_shell": 1.03}, {"start": "1971-07", "end": "1974-06", "mean_oni": -0.24, "delta_H": -0.01, "inverted": true, "H_core": 0.86, "H_shell": 0.86}, {"start": "1972-01", "end": "1974-12", "mean_oni": -0.19, "delta_H": 0.01, "inverted": false, "H_core": 0.89, "H_shell": 0.9}, {"start": "1972-07", "end": "1975-06", "mean_oni": -0.34, "delta_H": 0.95, "inverted": false, "H_core": 0.97, "H_shell": 1.92}, {"start": "1973-01", "end": "1975-12", "mean_oni": -0.85, "delta_H": 1.15, "inverted": false, "H_core": 0.87, "H_shell": 2.02}, {"start": "1973-07", "end": "1976-06", "mean_oni": -1.03, "delta_H": 0.3, "inverted": false, "H_core": 1.12, "H_shell": 1.42}, {"start": "1974-01", "end": "1976-12", "mean_oni": -0.66, "delta_H": 1.02, "inverted": false, "H_core": 0.86, "H_shell": 1.89}, {"start": "1974-07", "end": "1977-06", "mean_oni": -0.39, "delta_H": 0.56, "inverted": false, "H_core": 0.9, "H_shell": 1.47}, {"start": "1975-01", "end": "1977-12", "mean_oni": -0.2, "delta_H": 0.86, "inverted": false, "H_core": 0.89, "H_shell": 1.75}, {"start": "1975-07", "end": "1978-06", "mean_oni": -0.07, "delta_H": 0.43, "inverted": false, "H_core": 0.94, "H_shell": 1.37}, {"start": "1976-01", "end": "1978-12", "mean_oni": 0.12, "delta_H": 1.31, "inverted": false, "H_core": 0.9, "H_shell": 2.2}, {"start": "1976-07", "end": "1979-06", "mean_oni": 0.26, "delta_H": -0.03, "inverted": true, "H_core": 1.01, "H_shell": 0.98}, {"start": "1977-01", "end": "1979-12", "mean_oni": 0.22, "delta_H": -0.14, "inverted": true, "H_core": 1.03, "H_shell": 0.89}, {"start": "1977-07", "end": "1980-06", "mean_oni": 0.23, "delta_H": -0.08, "inverted": true, "H_core": 0.97, "H_shell": 0.89}, {"start": "1978-01", "end": "1980-12", "mean_oni": 0.14, "delta_H": 0.33, "inverted": false, "H_core": 0.92, "H_shell": 1.25}, {"start": "1978-07", "end": "1981-06", "mean_oni": 0.06, "delta_H": 0.03, "inverted": false, "H_core": 0.88, "H_shell": 0.91}, {"start": "1979-01", "end": "1981-12", "mean_oni": 0.08, "delta_H": 0.02, "inverted": false, "H_core": 0.96, "H_shell": 0.98}, {"start": "1979-07", "end": "1982-06", "mean_oni": 0.11, "delta_H": 0.14, "inverted": false, "H_core": 0.9, "H_shell": 1.03}, {"start": "1980-01", "end": "1982-12", "mean_oni": 0.33, "delta_H": -0.21, "inverted": true, "H_core": 1.48, "H_shell": 1.27}, {"start": "1980-07", "end": "1983-06", "mean_oni": 0.49, "delta_H": -0.55, "inverted": true, "H_core": 1.44, "H_shell": 0.89}, {"start": "1981-01", "end": "1983-12", "mean_oni": 0.4, "delta_H": 0.14, "inverted": false, "H_core": 1.17, "H_shell": 1.31}, {"start": "1981-07", "end": "1984-06", "mean_oni": 0.38, "delta_H": -0.26, "inverted": true, "H_core": 1.14, "H_shell": 0.88}, {"start": "1982-01", "end": "1984-12", "mean_oni": 0.32, "delta_H": 0.15, "inverted": false, "H_core": 1.02, "H_shell": 1.17}, {"start": "1982-07", "end": "1985-06", "mean_oni": 0.13, "delta_H": 0.34, "inverted": false, "H_core": 0.98, "H_shell": 1.32}, {"start": "1983-01", "end": "1985-12", "mean_oni": -0.21, "delta_H": 0.83, "inverted": false, "H_core": 0.99, "H_shell": 1.82}, {"start": "1983-07", "end": "1986-06", "mean_oni": -0.5, "delta_H": 0.09, "inverted": false, "H_core": 0.96, "H_shell": 1.05}, {"start": "1984-01", "end": "1986-12", "mean_oni": -0.28, "delta_H": 0.84, "inverted": false, "H_core": 0.94, "H_shell": 1.78}, {"start": "1984-07", "end": "1987-06", "mean_oni": -0.02, "delta_H": 1.51, "inverted": false, "H_core": 0.87, "H_shell": 2.38}, {"start": "1985-01", "end": "1987-12", "mean_oni": 0.31, "delta_H": 1.97, "inverted": false, "H_core": 1.02, "H_shell": 2.99}, {"start": "1985-07", "end": "1988-06", "mean_oni": 0.42, "delta_H": 0.51, "inverted": false, "H_core": 0.87, "H_shell": 1.38}, {"start": "1986-01", "end": "1988-12", "mean_oni": 0.24, "delta_H": 0.71, "inverted": false, "H_core": 0.87, "H_shell": 1.58}, {"start": "1986-07", "end": "1989-06", "mean_oni": 0.12, "delta_H": 0.2, "inverted": false, "H_core": 0.78, "H_shell": 0.99}, {"start": "1987-01", "end": "1989-12", "mean_oni": -0.05, "delta_H": 0.37, "inverted": false, "H_core": 0.85, "H_shell": 1.22}, {"start": "1987-07", "end": "1990-06", "mean_oni": -0.19, "delta_H": 0.22, "inverted": false, "H_core": 1.01, "H_shell": 1.23}, {"start": "1988-01", "end": "1990-12", "mean_oni": -0.37, "delta_H": 0.02, "inverted": false, "H_core": 1.01, "H_shell": 1.04}, {"start": "1988-07", "end": "1991-06", "mean_oni": -0.28, "delta_H": 2.15, "inverted": false, "H_core": 1.39, "H_shell": 3.54}, {"start": "1989-01", "end": "1991-12", "mean_oni": 0.12, "delta_H": 1.36, "inverted": false, "H_core": 1.13, "H_shell": 2.49}, {"start": "1989-07", "end": "1992-06", "mean_oni": 0.51, "delta_H": 0.17, "inverted": false, "H_core": 1.25, "H_shell": 1.41}, {"start": "1990-01", "end": "1992-12", "mean_oni": 0.53, "delta_H": -0.16, "inverted": true, "H_core": 1.27, "H_shell": 1.11}, {"start": "1990-07", "end": "1993-06", "mean_oni": 0.57, "delta_H": -0.06, "inverted": true, "H_core": 1.11, "H_shell": 1.05}, {"start": "1991-01", "end": "1993-12", "mean_oni": 0.53, "delta_H": 0.17, "inverted": false, "H_core": 1.09, "H_shell": 1.26}, {"start": "1991-07", "end": "1994-06", "mean_oni": 0.51, "delta_H": 0.12, "inverted": false, "H_core": 1.11, "H_shell": 1.23}, {"start": "1992-01", "end": "1994-12", "mean_oni": 0.47, "delta_H": 0.35, "inverted": false, "H_core": 1.14, "H_shell": 1.48}, {"start": "1992-07", "end": "1995-06", "mean_oni": 0.33, "delta_H": 0.04, "inverted": false, "H_core": 1.06, "H_shell": 1.1}, {"start": "1993-01", "end": "1995-12", "mean_oni": 0.21, "delta_H": 0.27, "inverted": false, "H_core": 0.93, "H_shell": 1.2}, {"start": "1993-07", "end": "1996-06", "mean_oni": 0.04, "delta_H": 0.24, "inverted": false, "H_core": 0.99, "H_shell": 1.24}, {"start": "1994-01", "end": "1996-12", "mean_oni": -0.05, "delta_H": 0.26, "inverted": false, "H_core": 0.93, "H_shell": 1.2}, {"start": "1994-07", "end": "1997-06", "mean_oni": -0.05, "delta_H": 0.55, "inverted": false, "H_core": 0.81, "H_shell": 1.36}, {"start": "1995-01", "end": "1997-12", "mean_oni": 0.18, "delta_H": 0.85, "inverted": false, "H_core": 1.18, "H_shell": 2.03}, {"start": "1995-07", "end": "1998-06", "mean_oni": 0.3, "delta_H": 0.09, "inverted": false, "H_core": 1.03, "H_shell": 1.12}, {"start": "1996-01", "end": "1998-12", "mean_oni": 0.22, "delta_H": 0.92, "inverted": false, "H_core": 0.98, "H_shell": 1.9}, {"start": "1996-07", "end": "1999-06", "mean_oni": 0.11, "delta_H": 1.03, "inverted": false, "H_core": 0.91, "H_shell": 1.93}, {"start": "1997-01", "end": "1999-12", "mean_oni": -0.04, "delta_H": 1.08, "inverted": false, "H_core": 0.83, "H_shell": 1.92}, {"start": "1997-07", "end": "2000-06", "mean_oni": -0.25, "delta_H": 1.38, "inverted": false, "H_core": 0.85, "H_shell": 2.23}, {"start": "1998-01", "end": "2000-12", "mean_oni": -0.71, "delta_H": 1.27, "inverted": false, "H_core": 0.81, "H_shell": 2.08}, {"start": "1998-07", "end": "2001-06", "mean_oni": -0.96, "delta_H": 0.18, "inverted": false, "H_core": 1.0, "H_shell": 1.18}, {"start": "1999-01", "end": "2001-12", "mean_oni": -0.79, "delta_H": 1.05, "inverted": false, "H_core": 1.05, "H_shell": 2.11}, {"start": "1999-07", "end": "2002-06", "mean_oni": -0.56, "delta_H": 1.58, "inverted": false, "H_core": 1.1, "H_shell": 2.67}, {"start": "2000-01", "end": "2002-12", "mean_oni": -0.17, "delta_H": 0.95, "inverted": false, "H_core": 1.12, "H_shell": 2.06}, {"start": "2000-07", "end": "2003-06", "mean_oni": 0.04, "delta_H": 0.45, "inverted": false, "H_core": 0.99, "H_shell": 1.43}, {"start": "2001-01", "end": "2003-12", "mean_oni": 0.19, "delta_H": 1.01, "inverted": false, "H_core": 1.0, "H_shell": 2.01}, {"start": "2001-07", "end": "2004-06", "mean_oni": 0.3, "delta_H": -0.03, "inverted": true, "H_core": 1.1, "H_shell": 1.07}, {"start": "2002-01", "end": "2004-12", "mean_oni": 0.44, "delta_H": 0.39, "inverted": false, "H_core": 1.06, "H_shell": 1.45}, {"start": "2002-07", "end": "2005-06", "mean_oni": 0.48, "delta_H": 0.27, "inverted": false, "H_core": 1.1, "H_shell": 1.37}, {"start": "2003-01", "end": "2005-12", "mean_oni": 0.25, "delta_H": 1.36, "inverted": false, "H_core": 0.83, "H_shell": 2.19}, {"start": "2003-07", "end": "2006-06", "mean_oni": 0.13, "delta_H": 0.08, "inverted": false, "H_core": 0.93, "H_shell": 1.01}, {"start": "2004-01", "end": "2006-12", "mean_oni": 0.19, "delta_H": 0.2, "inverted": false, "H_core": 0.86, "H_shell": 1.06}, {"start": "2004-07", "end": "2007-06", "mean_oni": 0.13, "delta_H": 0.25, "inverted": false, "H_core": 0.86, "H_shell": 1.1}, {"start": "2005-01", "end": "2007-12", "mean_oni": -0.16, "delta_H": 0.49, "inverted": false, "H_core": 0.85, "H_shell": 1.35}, {"start": "2005-07", "end": "2008-06", "mean_oni": -0.43, "delta_H": -0.04, "inverted": true, "H_core": 0.95, "H_shell": 0.91}, {"start": "2006-01", "end": "2008-12", "mean_oni": -0.44, "delta_H": -0.1, "inverted": true, "H_core": 0.95, "H_shell": 0.85}, {"start": "2006-07", "end": "2009-06", "mean_oni": -0.43, "delta_H": -0.09, "inverted": true, "H_core": 0.95, "H_shell": 0.86}, {"start": "2007-01", "end": "2009-12", "mean_oni": -0.37, "delta_H": 0.38, "inverted": false, "H_core": 0.92, "H_shell": 1.3}, {"start": "2007-07", "end": "2010-06", "mean_oni": -0.27, "delta_H": 0.04, "inverted": false, "H_core": 0.88, "H_shell": 0.92}, {"start": "2008-01", "end": "2010-12", "mean_oni": -0.33, "delta_H": 0.06, "inverted": false, "H_core": 0.84, "H_shell": 0.9}, {"start": "2008-07", "end": "2011-06", "mean_oni": -0.26, "delta_H": 0.0, "inverted": false, "H_core": 0.9, "H_shell": 0.9}, {"start": "2009-01", "end": "2011-12", "mean_oni": -0.32, "delta_H": 0.26, "inverted": false, "H_core": 0.89, "H_shell": 1.15}, {"start": "2009-07", "end": "2012-06", "mean_oni": -0.32, "delta_H": 0.55, "inverted": false, "H_core": 0.91, "H_shell": 1.46}, {"start": "2010-01", "end": "2012-12", "mean_oni": -0.44, "delta_H": 0.87, "inverted": false, "H_core": 0.98, "H_shell": 1.85}, {"start": "2010-07", "end": "2013-06", "mean_oni": -0.57, "delta_H": -0.16, "inverted": true, "H_core": 1.12, "H_shell": 0.97}, {"start": "2011-01", "end": "2013-12", "mean_oni": -0.36, "delta_H": 0.3, "inverted": false, "H_core": 0.97, "H_shell": 1.27}, {"start": "2011-07", "end": "2014-06", "mean_oni": -0.23, "delta_H": -0.14, "inverted": true, "H_core": 1.05, "H_shell": 0.91}, {"start": "2012-01", "end": "2014-12", "mean_oni": -0.03, "delta_H": 0.67, "inverted": false, "H_core": 0.93, "H_shell": 1.6}, {"start": "2012-07", "end": "2015-06", "mean_oni": 0.17, "delta_H": 0.2, "inverted": false, "H_core": 1.0, "H_shell": 1.2}, {"start": "2013-01", "end": "2015-12", "mean_oni": 0.51, "delta_H": 0.65, "inverted": false, "H_core": 1.45, "H_shell": 2.1}, {"start": "2013-07", "end": "2016-06", "mean_oni": 0.78, "delta_H": -0.5, "inverted": true, "H_core": 1.45, "H_shell": 0.95}, {"start": "2014-01", "end": "2016-12", "mean_oni": 0.73, "delta_H": -0.33, "inverted": true, "H_core": 1.26, "H_shell": 0.93}, {"start": "2014-07", "end": "2017-06", "mean_oni": 0.76, "delta_H": -0.4, "inverted": true, "H_core": 1.23, "H_shell": 0.84}, {"start": "2015-01", "end": "2017-12", "mean_oni": 0.62, "delta_H": 1.47, "inverted": false, "H_core": 1.07, "H_shell": 2.54}, {"start": "2015-07", "end": "2018-06", "mean_oni": 0.41, "delta_H": 0.91, "inverted": false, "H_core": 1.12, "H_shell": 2.03}, {"start": "2016-01", "end": "2018-12", "mean_oni": 0.13, "delta_H": 1.05, "inverted": false, "H_core": 1.1, "H_shell": 2.14}, {"start": "2016-07", "end": "2019-06", "mean_oni": 0.03, "delta_H": 0.61, "inverted": false, "H_core": 0.8, "H_shell": 1.41}, {"start": "2017-01", "end": "2019-12", "mean_oni": 0.18, "delta_H": 0.4, "inverted": false, "H_core": 0.98, "H_shell": 1.37}, {"start": "2017-07", "end": "2020-06", "mean_oni": 0.21, "delta_H": 0.26, "inverted": false, "H_core": 0.89, "H_shell": 1.15}, {"start": "2018-01", "end": "2020-12", "mean_oni": 0.13, "delta_H": 0.08, "inverted": false, "H_core": 0.87, "H_shell": 0.95}, {"start": "2018-07", "end": "2021-06", "mean_oni": 0.1, "delta_H": 0.14, "inverted": false, "H_core": 0.84, "H_shell": 0.98}, {"start": "2019-01", "end": "2021-12", "mean_oni": -0.11, "delta_H": 1.09, "inverted": false, "H_core": 0.91, "H_shell": 2.0}, {"start": "2019-07", "end": "2022-06", "mean_oni": -0.38, "delta_H": 0.8, "inverted": false, "H_core": 0.85, "H_shell": 1.66}, {"start": "2020-01", "end": "2022-12", "mean_oni": -0.59, "delta_H": 0.62, "inverted": false, "H_core": 0.82, "H_shell": 1.44}, {"start": "2020-07", "end": "2023-06", "mean_oni": -0.61, "delta_H": 0.9, "inverted": false, "H_core": 0.83, "H_shell": 1.72}, {"start": "2021-01", "end": "2023-12", "mean_oni": -0.19, "delta_H": 0.95, "inverted": false, "H_core": 0.99, "H_shell": 1.94}, {"start": "2021-07", "end": "2024-06", "mean_oni": 0.08, "delta_H": 0.43, "inverted": false, "H_core": 0.91, "H_shell": 1.35}, {"start": "2022-01", "end": "2024-12", "mean_oni": 0.16, "delta_H": 0.47, "inverted": false, "H_core": 1.0, "H_shell": 1.47}, {"start": "2022-07", "end": "2025-06", "mean_oni": 0.28, "delta_H": 0.12, "inverted": false, "H_core": 1.1, "H_shell": 1.22}, {"start": "2023-01", "end": "2025-12", "mean_oni": 0.36, "delta_H": -0.18, "inverted": true, "H_core": 1.19, "H_shell": 1.01}], "oni_recent": [{"date": "2023-06", "oni": 0.84}, {"date": "2023-07", "oni": 1.12}, {"date": "2023-08", "oni": 1.37}, {"date": "2023-09", "oni": 1.6}, {"date": "2023-10", "oni": 1.83}, {"date": "2023-11", "oni": 1.99}, {"date": "2023-12", "oni": 2.06}, {"date": "2024-01", "oni": 1.92}, {"date": "2024-02", "oni": 1.62}, {"date": "2024-03", "oni": 1.26}, {"date": "2024-04", "oni": 0.82}, {"date": "2024-05", "oni": 0.49}, {"date": "2024-06", "oni": 0.22}, {"date": "2024-07", "oni": 0.08}, {"date": "2024-08", "oni": -0.07}, {"date": "2024-09", "oni": -0.17}, {"date": "2024-10", "oni": -0.21}, {"date": "2024-11", "oni": -0.3}, {"date": "2024-12", "oni": -0.42}, {"date": "2025-01", "oni": -0.45}, {"date": "2025-02", "oni": -0.24}, {"date": "2025-03", "oni": -0.06}, {"date": "2025-04", "oni": 0.02}, {"date": "2025-05", "oni": -0.02}, {"date": "2025-06", "oni": -0.04}, {"date": "2025-07", "oni": -0.14}, {"date": "2025-08", "oni": -0.28}, {"date": "2025-09", "oni": -0.4}, {"date": "2025-10", "oni": -0.51}, {"date": "2025-11", "oni": -0.55}, {"date": "2025-12", "oni": -0.54}, {"date": "2026-01", "oni": -0.37}, {"date": "2026-02", "oni": -0.14}, {"date": "2026-03", "oni": 0.13}, {"date": "2026-04", "oni": 0.51}, {"date": "2026-05", "oni": 0.98}]};
+
+// ═══════ RENDER ═══════
+const oni = DATA.latest_oni;
+const dH = DATA.windows[DATA.windows.length-1].delta_H;
+const inverted = DATA.windows[DATA.windows.length-1].inverted;
+const invRate = (DATA.windows.filter(w=>w.inverted).length / DATA.windows.length * 100).toFixed(1);
+
+// Phase
+let phase = "中性";
+if (oni >= 1.5) phase = "強聖嬰";
+else if (oni >= 0.5) phase = "聖嬰";
+else if (oni <= -1.5) phase = "強反聖嬰";
+else if (oni <= -0.5) phase = "反聖嬰";
+
+// Warning
+let signals = 0;
+if (inverted) signals++;
+let level, icon, detail;
+if (signals === 0) {
+    level="綠色 — 正常"; icon="🟢"; 
+    detail="暫無異常信號，深層結構穩定。建議每月檢查一次。";
+} else if (signals === 1) {
+    level="黃色 — 注意"; icon="🟡";
+    detail="Core-Shell 深層結構反轉（ΔH="+dH.toFixed(2)+"）。歷史上同類信號曾於 1996 年中出現，6 個月後發生 1997 超級聖嬰。建議關注未來 3-6 個月變化。";
+} else {
+    level="紅色 — 警報"; icon="🔴";
+    detail="多個信號同時異常！強烈建議密切關注未來數月可能出現嘅重大 ENSO 事件。";
+}
+
+// ONI description
+let oniDesc = "";
+if (oni >= 1.5) oniDesc = "🔴 強聖嬰！赤道太平洋海水明顯變暖，秘魯漁獲可能減少，東南亞可能乾旱。";
+else if (oni >= 0.5) oniDesc = "🟠 聖嬰狀態，海水偏暖。留意漁業同農業影響。";
+else if (oni <= -1.5) oniDesc = "🔵 強反聖嬰！海水明顯變冷，澳洲/東南亞可能多雨，大西洋颶風可能增加。";
+else if (oni <= -0.5) oniDesc = "🟦 反聖嬰狀態，海水偏冷。";
+else oniDesc = "⚪ 中性狀態，赤道太平洋水溫正常。";
+
+// Update DOM
+document.getElementById("wl-icon").textContent = icon;
+document.getElementById("wl-text").textContent = level;
+document.getElementById("wl-detail").textContent = detail;
+document.getElementById("oni-val").textContent = (oni>=0?"+":"")+oni.toFixed(2)+"°C";
+document.getElementById("oni-date").textContent = "NOAA ONI · "+DATA.latest_date;
+document.getElementById("oni-desc").textContent = oniDesc;
+document.getElementById("m-dh").innerHTML = (dH>=0?"+":"")+dH.toFixed(2)+" <span class='lbl' style='display:block'>"+(inverted?"⚠️ 反轉":"✅ 正常")+"</span>";
+document.getElementById("m-inv").textContent = invRate+"%";
+document.getElementById("m-phase").textContent = phase;
+document.getElementById("m-sig").textContent = signals+"/2";
+
+// Warning card color
+const wc = document.getElementById("warning-card");
+if (signals===0) wc.style.borderColor="#064e3b";
+else if (signals===1) wc.style.borderColor="#78350f";
+else wc.style.borderColor="#7f1d1d";
+
+// ═══════ ΔH CHART ═══════
+(function(){
+const c=document.getElementById("dh-chart"), ctx=c.getContext("2d");
+const W=c.parentElement.clientWidth-40, H=180;
+c.width=W*2; c.height=H*2; c.style.width=W+"px"; c.style.height=H+"px";
+ctx.scale(2,2);
+const ws=DATA.windows, n=ws.length;
+const pad={t:16,r:12,b:28,l:48};
+const pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+
+const dHs=ws.map(w=>w.delta_H);
+const max=Math.max(...dHs.map(Math.abs));
+const ymin=-Math.ceil(max), ymax=Math.ceil(max);
+
+function x(i){return pad.l+(i/(n-1))*pw}
+function y(v){return pad.t+ph-(v-ymin)/(ymax-ymin)*ph}
+
+// Grid
+ctx.strokeStyle="#1f2937"; ctx.lineWidth=.5;
+for(let i=ymin;i<=ymax;i+=Math.max(1,Math.ceil((ymax-ymin)/6))){
+ctx.beginPath(); ctx.moveTo(pad.l,y(i)); ctx.lineTo(pad.l+pw,y(i)); ctx.stroke();
+ctx.fillStyle="#4b5563"; ctx.font="9px sans-serif"; ctx.textAlign="right";
+ctx.fillText(i.toFixed(0),pad.l-6,y(i)+3);
+}
+
+// Bars
+ws.forEach((w,i)=>{
+const h=Math.abs(y(w.delta_H)-y(0));
+ctx.fillStyle=w.inverted?"#ef4444":"#3b82f6";
+ctx.globalAlpha=0.7;
+const bw=Math.max(1,(pw/n)*0.6);
+ctx.fillRect(x(i)-bw/2,y(Math.min(0,w.delta_H)),bw,h);
+ctx.globalAlpha=1;
+});
+
+// Zero line
+ctx.strokeStyle="#6b7280"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+ctx.beginPath(); ctx.moveTo(pad.l,y(0)); ctx.lineTo(pad.l+pw,y(0)); ctx.stroke();
+ctx.setLineDash([]);
+
+// Labels
+ctx.fillStyle="#6b7280"; ctx.font="9px sans-serif"; ctx.textAlign="center";
+const step=Math.max(1,Math.floor(n/6));
+for(let i=0;i<n;i+=step){
+ctx.fillText(ws[i].start.substring(0,7),x(i),H-pad.b+14);
+}
+})();
+
+// ═══════ ONI CHART ═══════
+(function(){
+const c=document.getElementById("oni-chart"), ctx=c.getContext("2d");
+const W=c.parentElement.clientWidth-40, H=160;
+c.width=W*2; c.height=H*2; c.style.width=W+"px"; c.style.height=H+"px";
+ctx.scale(2,2);
+const rs=DATA.oni_recent, n=rs.length;
+const pad={t:12,r:12,b:24,l:44};
+const pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+
+const vs=rs.map(r=>r.oni);
+const ymin=-3, ymax=3;
+
+function x(i){return pad.l+(i/(n-1))*pw}
+function y(v){return pad.t+ph-(v-ymin)/(ymax-ymin)*ph}
+
+// Zones
+ctx.fillStyle="rgba(239,68,68,0.08)";
+ctx.fillRect(pad.l,y(0.5),pw,y(3)-y(0.5));
+ctx.fillStyle="rgba(59,130,246,0.08)";
+ctx.fillRect(pad.l,y(-3),pw,y(-0.5)-y(-3));
+
+// Grid
+ctx.strokeStyle="#1f2937"; ctx.lineWidth=.5;
+[-2,-1,0,1,2].forEach(v=>{
+ctx.beginPath(); ctx.moveTo(pad.l,y(v)); ctx.lineTo(pad.l+pw,y(v)); ctx.stroke();
+ctx.fillStyle="#4b5563"; ctx.font="9px sans-serif"; ctx.textAlign="right";
+ctx.fillText((v>=0?"+":"")+v,pad.l-6,y(v)+3);
+});
+
+// Zero
+ctx.strokeStyle="#6b7280"; ctx.lineWidth=1;
+ctx.beginPath(); ctx.moveTo(pad.l,y(0)); ctx.lineTo(pad.l+pw,y(0)); ctx.stroke();
+
+// Line
+ctx.strokeStyle="#f59e0b"; ctx.lineWidth=2; ctx.beginPath();
+vs.forEach((v,i)=>{i===0?ctx.moveTo(x(i),y(v)):ctx.lineTo(x(i),y(v))});
+ctx.stroke();
+
+// Dots
+vs.forEach((v,i)=>{
+ctx.fillStyle=v>=0.5?"#ef4444":v<=-0.5?"#3b82f6":"#6b7280";
+ctx.beginPath(); ctx.arc(x(i),y(v),2.5,0,Math.PI*2); ctx.fill();
+});
+
+// Labels
+ctx.fillStyle="#6b7280"; ctx.font="9px sans-serif"; ctx.textAlign="center";
+const step=Math.max(1,Math.floor(n/8));
+for(let i=0;i<n;i+=step){
+ctx.fillText(rs[i].date,i===n-1?x(i)-14:x(i),H-pad.b+14);
+}
+
+// Legend
+ctx.fillStyle="#ef4444"; ctx.fillRect(pad.l,10,10,10);
+ctx.fillStyle="#9ca3af"; ctx.font="10px sans-serif"; ctx.fillText("聖嬰",pad.l+14,19);
+ctx.fillStyle="#3b82f6"; ctx.fillRect(pad.l+50,10,10,10);
+ctx.fillText("反聖嬰",pad.l+64,19);
+})();
+</script>
+</body>
+</html>
